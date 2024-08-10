@@ -1,4 +1,4 @@
-#include <TEA5767N.h>  //https://github.com/mroger/TEA5767
+#include <TEA5767N.h>  // https://github.com/mroger/TEA5767
 #include <Wire.h>
 
 TEA5767N radio = TEA5767N();
@@ -6,12 +6,9 @@ TEA5767N radio = TEA5767N();
 float frequency = 89.9;
 
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(9600);
-
   Serial.println("Starting");
 
-  // radio.mute();
   radio.setMonoReception();
   radio.setStereoNoiseCancellingOn();
   radio.selectFrequency(frequency);
@@ -19,18 +16,19 @@ void setup() {
 
 void loop() {
   if (Serial.available() > 0) {
-    float input = Serial.parseFloat();
+    String input = Serial.readStringUntil('\n');  // Read the input as a string
+    input.trim();  // Trim any surrounding whitespace or newlines
 
-    // If input is not zero and not invalid
-    if (input != 0.0) {
-      frequency = input;
-      radio.turnTheSoundBackOn();
-      radio.setStandByOff();
-      radio.selectFrequency(frequency);
-      Serial.println(frequency);
-    } else {
-      // Check if the input is truly zero or if it was a timeout/error
-      if (Serial.peek() == '\n') {  // Check if the end of the input was reached
+    // If input is not empty
+    if (input.length() > 0) {
+      frequency = input.toFloat();  // Convert string to float
+
+      if (frequency > 0.0) {  // Valid frequency
+        radio.turnTheSoundBackOn();
+        radio.setStandByOff();
+        radio.selectFrequency(frequency);
+        Serial.println(frequency);
+      } else {  // If frequency is zero or invalid, mute the radio
         radio.mute();
         radio.setStandByOn();
         Serial.println("Muted");
@@ -38,4 +36,3 @@ void loop() {
     }
   }
 }
-

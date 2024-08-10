@@ -2,10 +2,14 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.rmi.server.ExportException;
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.Objects;
+import com.fazecast.jSerialComm.SerialPort;
 
 public class Main implements ActionListener {
+    SerialPort sp;
+
     private int count = 0;
     private Color background = new Color(28, 28, 31);
     private final String primaryFont = "Stencil";
@@ -25,6 +29,19 @@ public class Main implements ActionListener {
     private JTextField frequencyInput;
 
     public Main() {
+        // Set up serial communication
+        System.out.println(Arrays.toString(SerialPort.getCommPorts()));
+
+        sp = SerialPort.getCommPort("COM6");
+
+        sp.setComPortParameters(9600,8,1,0);
+        sp.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING|SerialPort.TIMEOUT_READ_BLOCKING,10000,10000);
+
+        if(!sp.openPort()) {
+            System.out.println("\nCOM port not available\n");
+            return;
+        }
+
         // Initialize the main frame and panel
         frame = new JFrame();
         mainPanel = new JPanel();
@@ -68,7 +85,7 @@ public class Main implements ActionListener {
         labelPanel.setBackground(background);
         upperLeftPanel.add(labelPanel);
 
-        label = new JLabel("Frequency: "+frequency+"FM");
+        label = new JLabel("Frequency: " + frequency + "FM");
         label.setForeground(Color.white);
         label.setHorizontalAlignment(SwingConstants.CENTER);
         label.setFont(new Font(primaryFont, Font.PLAIN, 14));
@@ -109,6 +126,20 @@ public class Main implements ActionListener {
         // Finalize the frame setup
         frame.pack();
         frame.setVisible(true);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Closing");
+            try {
+                if (sp.isOpen()) {
+                    // Send a message to the Arduino before closing
+                    sp.getOutputStream().write("0\n".getBytes());
+                    Thread.sleep(100); // Shorter sleep to avoid long delay
+                    sp.closePort(); // Close the serial port gracefully
+                }
+            } catch (IOException | InterruptedException e) {
+                System.err.println("Error during shutdown: " + e.getMessage());
+            }
+        }, "Shutdown-thread"));
     }
 
     public static void main(String[] args) {
@@ -120,12 +151,16 @@ public class Main implements ActionListener {
         // Handle button click events
         if (Objects.equals(e.getActionCommand(), "Set frequency")) {
             try {
-                frequency = Float.parseFloat(frequencyInput.getText().replace("FM",""));
+                frequency = Float.parseFloat(frequencyInput.getText().replace("FM", ""));
                 if (frequency == 0) {
                     label.setText("Muted");
                 } else {
                     label.setText("Frequency: " + frequency + "FM");
                 }
+
+                // Send the frequency as a string followed by a newline
+                String frequencyString = frequency.toString() + "\n";
+                sp.getOutputStream().write(frequencyString.getBytes());
                 frequencyInput.setText("");
             }
             catch (Exception exception) {
