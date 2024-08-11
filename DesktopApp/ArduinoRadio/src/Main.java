@@ -298,20 +298,20 @@ public class Main implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         if (Objects.equals(e.getActionCommand(), "Set frequency")) {
-            count++;
-            frequency = Float.parseFloat(frequencyInput.getText());
-            label.setText("Frequency: " + frequency + "FM");
-
             try {
+                frequency = Float.parseFloat(frequencyInput.getText());
+                label.setText("Frequency: " + frequency + "FM");
+                
                 // Send the frequency value to the Arduino
                 sp.getOutputStream().write((frequency.toString() + "\n").getBytes());
-            } catch (IOException ex) {
-                ex.printStackTrace();
+                frequencyInput.setText("");
+            } catch (Exception ex) {
+                frequencyInput.setText("Invalid");
             }
         }
     }
 
     public void scanStations() {
-        
+
     }
 }
