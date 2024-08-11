@@ -31,7 +31,6 @@ void loop() {
       } else {  // If frequency is zero or invalid, mute the radio
         radio.mute();
         radio.setStandByOn();
-        Serial.println("Muted");
       }
     }
   }
