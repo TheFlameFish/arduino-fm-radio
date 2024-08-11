@@ -300,7 +300,11 @@ public class Main implements ActionListener {
         if (Objects.equals(e.getActionCommand(), "Set frequency")) {
             try {
                 frequency = Float.parseFloat(frequencyInput.getText());
-                label.setText("Frequency: " + frequency + "FM");
+                if (frequency != 0.0f) {
+                    label.setText("Frequency: " + frequency + "FM");
+                } else {
+                    label.setText("Muted");
+                }
                 
                 // Send the frequency value to the Arduino
                 sp.getOutputStream().write((frequency.toString() + "\n").getBytes());
