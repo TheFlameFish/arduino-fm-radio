@@ -172,6 +172,7 @@ public class Main implements ActionListener {
         frequencyInput = new JTextField();
         frequencyInput.setFont(new Font(primaryFont, Font.PLAIN, 14));
         frequencyInput.setHorizontalAlignment(SwingConstants.CENTER);
+        frequencyInput.addActionListener(this);
         inputPanel.add(frequencyInput, BorderLayout.CENTER);
 
         frequencySetButton = new JButton("Set frequency");
@@ -401,7 +402,7 @@ public class Main implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (Objects.equals(e.getActionCommand(), "Set frequency")) {
+        if (Objects.equals(e.getActionCommand(), "Set frequency") || e.getSource() == frequencyInput) {
             try {
                 frequency = Float.parseFloat(frequencyInput.getText());
                 if (frequency != 0.0f) {
