@@ -15,6 +15,8 @@ public class Main implements ActionListener {
     private Color background = new Color(28, 28, 31);
     private final String primaryFont = "Stencil";
     private Float frequency = 89.9f;
+    private String commName = "COM6";
+    private boolean comboBoxesPopulated = false;
 
     // Declare the components as private instance variables
     private JFrame frame;
@@ -33,14 +35,19 @@ public class Main implements ActionListener {
     private TargetDataLine microphone;
     private SourceDataLine speakers;
     private final AudioFormat format = new AudioFormat(44100, 16, 2, true, true);
+    private JComboBox<String> portComboBox;
     private JComboBox<String> inputComboBox;
     private JComboBox<String> outputComboBox;
 
     public Main() {
         // Set up serial communication
+        for (SerialPort port : SerialPort.getCommPorts()) {
+            System.out.println(port.getSystemPortName());
+        }
         System.out.println(Arrays.toString(SerialPort.getCommPorts()));
 
         sp = SerialPort.getCommPort("COM6");
+        System.out.println(sp.getPortDescription());
 
         sp.setComPortParameters(9600,8,1,0);
         sp.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING|SerialPort.TIMEOUT_READ_BLOCKING,10000,10000);
@@ -127,11 +134,13 @@ public class Main implements ActionListener {
         // Set up the right panel and add it to the main panel
         rightPanel = new JPanel();
         rightPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        rightPanel.setLayout(new GridLayout(4, 1)); // Adding grid layout to accommodate combo boxes
+        rightPanel.setLayout(new GridLayout(6, 1)); // Adding grid layout to accommodate combo boxes
         rightPanel.setBackground(background);
         mainPanel.add(rightPanel);
 
         // Create the combo boxes for input and output device selection
+        portComboBox = new JComboBox<>();
+        portComboBox.addActionListener(this);
         inputComboBox = new JComboBox<>();
         outputComboBox = new JComboBox<>();
 
@@ -139,6 +148,12 @@ public class Main implements ActionListener {
         populateComboBoxes();
 
         // Add the combo boxes to the right panel
+        JLabel portLabel = new JLabel("Select port:");
+        portLabel.setForeground(Color.WHITE);
+        portLabel.setFont(new Font(primaryFont, Font.PLAIN, 14));
+        rightPanel.add(portLabel);
+        rightPanel.add(portComboBox);
+
         JLabel inputDeviceLabel = new JLabel("Select Input Device:");
         inputDeviceLabel.setForeground(Color.WHITE);
         inputDeviceLabel.setFont(new Font(primaryFont, Font.PLAIN, 14));
@@ -195,13 +210,26 @@ public class Main implements ActionListener {
             }
         }
 
+        for (SerialPort port : SerialPort.getCommPorts()) {
+            portComboBox.addItem(port.getSystemPortName());
+        }
+
         // Set default selections (system default)
         try {
             inputComboBox.setSelectedItem("Microphone (High Definition Audio Device)");
         } catch (Exception e) {
             inputComboBox.setSelectedItem(AudioSystem.getMixer(AudioSystem.getMixerInfo()[0]).getMixerInfo().getName());
         }
+
+        try {
+            portComboBox.setSelectedItem(commName);
+        } catch (Exception e) {
+            System.out.println("Default port not available.");
+        }
+
         outputComboBox.setSelectedItem(AudioSystem.getMixer(AudioSystem.getMixerInfo()[0]).getMixerInfo().getName());
+
+        comboBoxesPopulated = true;
     }
 
     private void setupAudioLoopback() {
@@ -311,7 +339,29 @@ public class Main implements ActionListener {
                 frequencyInput.setText("");
             } catch (Exception ex) {
                 frequencyInput.setText("Invalid");
+                System.out.println("Exception while setting frequency: " + ex.getMessage());
             }
+        } else if (Objects.equals(e.getActionCommand(), "comboBoxChanged")
+                && e.getSource() == portComboBox && comboBoxesPopulated) {
+            try {
+                System.out.println(e.getSource() == portComboBox);
+                commName = (String) portComboBox.getSelectedItem();
+                sp.closePort();
+                SerialPort new_sp = SerialPort.getCommPort(commName);
+                assert new_sp != null;
+                if (!new_sp.openPort()) {
+                    System.out.println("\nCOM port not available\n");
+                    return;
+                }
+                new_sp.setComPortParameters(9600, 8, 1, 0);
+                new_sp.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_BLOCKING, 10000, 10000);
+                sp = new_sp;
+            } catch (Exception ex) {
+                System.out.println("Switching comm port failed: " + ex.getMessage());
+            }
+            System.out.println(commName);
+        } else {
+            System.out.println(e.getActionCommand());
         }
     }
 
