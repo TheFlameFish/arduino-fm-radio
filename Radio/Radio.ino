@@ -7,7 +7,6 @@ float frequency = 89.9;
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("Starting");
 
   radio.setMonoReception();
   radio.setStereoNoiseCancellingOn();
@@ -27,12 +26,70 @@ void loop() {
         radio.turnTheSoundBackOn();
         radio.setStandByOff();
         radio.selectFrequency(frequency);
-        Serial.println(frequency);
+      } else if (input == "search") {
+        search();
       } else {  // If frequency is zero or invalid, mute the radio
         radio.mute();
         radio.setStandByOn();
         Serial.println("Muted");
       }
     }
+  }
+}
+
+void search() {
+  byte isBandLimitReached = 0;
+
+  radio.setSearchMidStopLevel();
+  isBandLimitReached = radio.startsSearchMutingFromBeginning();
+  
+
+  //delay(250);
+  
+  String freq = String(radio.readFrequencyInMHz());
+  printStation(freq);
+  //delay(250);
+  
+  while (!isBandLimitReached) {
+    
+    //If you want listen to station search, use radio.searchNext() instead
+    isBandLimitReached = radio.searchNext();
+    
+
+    //delay(250);
+    
+    freq = String(radio.readFrequencyInMHz());
+    printStation(freq);
+    //delay(250);
+  }
+  
+  
+  radio.setSearchDown();
+  radio.setSearchMidStopLevel();
+  
+  isBandLimitReached = radio.searchNextMuting();
+  
+
+  //delay(250);
+  
+  freq = String(radio.readFrequencyInMHz());
+  printStation(freq);
+  //delay(250);
+  
+  while (!isBandLimitReached) {
+    
+    isBandLimitReached = radio.searchNext();
+    
+    //delay(250);
+        
+    freq = String(radio.readFrequencyInMHz());
+    printStation(freq);
+    //delay(250);
+  }
+}
+
+void printStation(String freq) {
+  if (radio.getSignalLevel() >= 9) {
+    Serial.println(freq);
   }
 }

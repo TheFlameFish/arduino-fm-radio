@@ -8,11 +8,14 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Properties;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortDataListener;
+import com.fazecast.jSerialComm.SerialPortEvent;
 import jdk.jfr.Frequency;
 
 import javax.sound.sampled.*;
@@ -25,6 +28,7 @@ public class Main implements ActionListener {
     private Color background = new Color(28, 28, 31);
     private final String primaryFont = "Stencil";
     private Float frequency = 89.9f;
+    private ArrayList<String> stations;
     private String commName = "COM6";
     private boolean comboBoxesPopulated = false;
 
@@ -36,8 +40,11 @@ public class Main implements ActionListener {
     private JPanel labelPanel;
     private JPanel inputPanel;
     private JScrollPane lowerLeftPanel;
+    private JPanel lowerLeftPanelHeader;
+    private JPanel scrollPanel;
     private JPanel rightPanel;
     private JButton frequencySetButton;
+    private JButton stationSearchButton;
     private JLabel label;
     private JTextField frequencyInput;
 
@@ -81,6 +88,10 @@ public class Main implements ActionListener {
         commName = persistence.getProperty("commName","COM6");
         microphoneName = persistence.getProperty("microphoneName","Microphone (High Definition Audio Device)");
         speakerName = persistence.getProperty("speakerName","Primary Sound Driver");
+        stations = new ArrayList<String>(Arrays.asList(
+                persistence.getProperty("stations","").split(";")));
+        System.out.println(stations);
+
 
         System.out.println(speakerName);
 
@@ -112,6 +123,33 @@ public class Main implements ActionListener {
         } catch (IOException e) {
             System.out.println("Exception while setting frequency: " + e.getMessage());
         }
+
+        sp.addDataListener(new SerialPortDataListener() {
+            @Override
+            public int getListeningEvents() {
+                return SerialPort.LISTENING_EVENT_DATA_AVAILABLE;
+            }
+
+            @Override
+            public void serialEvent(SerialPortEvent event) {
+                if (event.getEventType() != SerialPort.LISTENING_EVENT_DATA_AVAILABLE)
+                    return;
+
+                byte[] newData = new byte[sp.bytesAvailable()];
+                int numRead = sp.readBytes(newData, newData.length);
+
+                // Convert the byte array to a String
+                String newString = new String(newData, 0, numRead);
+
+                // Print the received string
+                System.out.println(newString);
+
+                // Optionally add the string to a list or perform other actions
+                stations.add(newString);
+                updateStationsList();
+            }
+        });
+
 
         // Initialize the main frame and panel
         frame = new JFrame();
@@ -180,13 +218,28 @@ public class Main implements ActionListener {
         frequencySetButton.setFont(new Font(primaryFont, Font.BOLD, 14));
         inputPanel.add(frequencySetButton, BorderLayout.EAST);
 
+        scrollPanel = new JPanel();
+        scrollPanel.setLayout(new BoxLayout(scrollPanel,BoxLayout.Y_AXIS));
+
+
+
         // Adjust constraints for the lowerLeftPanel to take up more space
         gbc.gridy = 1;
         gbc.weighty = 0.9; // Larger weight for the lowerLeftPanel to take up more space
-        lowerLeftPanel = new JScrollPane();
+        lowerLeftPanel = new JScrollPane(scrollPanel);
         lowerLeftPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         lowerLeftPanel.setBackground(background);
         leftPanel.add(lowerLeftPanel, gbc);
+
+        stationSearchButton = new JButton("Search For Stations");
+        stationSearchButton.setBackground(Color.DARK_GRAY);
+        stationSearchButton.setForeground(Color.WHITE);
+        stationSearchButton.addActionListener(this);
+        JViewport columnHeaderViewport = new JViewport();
+        columnHeaderViewport.setView(stationSearchButton);
+        lowerLeftPanel.setColumnHeader(columnHeaderViewport);
+
+
 
         // Set up the right panel and add it to the main panel
         rightPanel = new JPanel();
@@ -229,6 +282,8 @@ public class Main implements ActionListener {
         frame.pack();
         frame.setVisible(true);
 
+        updateStationsList();
+
         // Set up the audio loopback in a separate thread
         new Thread(this::setupAudioLoopback).start();
 
@@ -253,6 +308,8 @@ public class Main implements ActionListener {
                 System.out.println(microphoneName);
                 persistence.setProperty("speakerName",speakerName);
                 System.out.println(speakerName);
+                persistence.setProperty("stations",arrayToString(stations));
+                System.out.println(arrayToString(stations));
 
                 System.out.println(configDirPath + "/config.properties");
                 persistence.store(new FileWriter(configDirPath + "/config.properties"), null);
@@ -441,6 +498,8 @@ public class Main implements ActionListener {
                 System.out.println("Switching comm port failed: " + ex.getMessage());
             }
             System.out.println(commName);
+        } else if (e.getSource() == stationSearchButton) {
+            scanStations();
         } else {
             System.out.println(e.getActionCommand());
         }
@@ -455,6 +514,38 @@ public class Main implements ActionListener {
     }
 
     public void scanStations() {
+        stations.clear();
+        try {
+            sp.getOutputStream().write("search\n".getBytes());
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
 
+    public void updateStationsList() { // Populates the stations scroll panel with the stations list array
+        scrollPanel.removeAll();
+        for (String o : stations) {
+            JButton button = new JButton(o);
+            button.setAlignmentX(Component.CENTER_ALIGNMENT);
+            button.setMaximumSize(new Dimension(Integer.MAX_VALUE, button.getPreferredSize().height));
+            button.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    frequencyInput.setText(button.getText());
+                    frequencySetButton.doClick();
+                }
+            });
+            scrollPanel.add(button);
+        }
+        scrollPanel.revalidate();
+        scrollPanel.repaint();
+    }
+
+    public String arrayToString(ArrayList<String> array) {
+        StringBuilder output = new StringBuilder();
+        for (String o : array) {
+            output.append(o).append(";");
+        }
+        return output.toString();
     }
 }
