@@ -525,6 +525,23 @@ public class Main implements ActionListener {
     public void updateStationsList() { // Populates the stations scroll panel with the stations list array
         scrollPanel.removeAll();
         for (String o : stations) {
+            JPanel panel = new JPanel();
+            panel.setBackground(Color.GRAY);
+
+            GridBagLayout gbl = new GridBagLayout();
+
+            panel.setLayout(gbl);
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = 0;
+            gbc.gridy = 0;
+
+            gbc.weighty = 1;
+
+            gbc.gridwidth = 0;
+            gbc.gridheight= 0;
+
+            gbc.fill = GridBagConstraints.BOTH;
+
             JButton button = new JButton(o);
             button.setAlignmentX(Component.CENTER_ALIGNMENT);
             button.setMaximumSize(new Dimension(Integer.MAX_VALUE, button.getPreferredSize().height));
@@ -535,7 +552,25 @@ public class Main implements ActionListener {
                     frequencySetButton.doClick();
                 }
             });
-            scrollPanel.add(button);
+
+            JButton removeButton = new JButton("X");
+            removeButton.setForeground(Color.RED);
+            removeButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    String frequency = button.getText();
+
+                    stations.remove(frequency);
+                    updateStationsList();
+                }
+            });
+            scrollPanel.add(panel);
+//            panel.add(button);
+//            panel.add(removeButton);
+            gbc.weightx = 0.9;
+            addobjects(button,panel,gbl,gbc,0,0,2,1);
+            gbc.weightx = 0.1;
+            addobjects(removeButton,panel,gbl,gbc,2,0,1,1);
         }
         scrollPanel.revalidate();
         scrollPanel.repaint();
@@ -547,5 +582,17 @@ public class Main implements ActionListener {
             output.append(o).append(";");
         }
         return output.toString();
+    }
+
+    public void addobjects(Component component, Container yourcontainer, GridBagLayout layout, GridBagConstraints gbc, int gridx, int gridy, int gridwidth, int gridheight){
+
+        gbc.gridx = gridx;
+        gbc.gridy = gridy;
+
+        gbc.gridwidth = gridwidth;
+        gbc.gridheight = gridheight;
+
+        layout.setConstraints(component, gbc);
+        yourcontainer.add(component);
     }
 }
