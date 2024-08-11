@@ -2,16 +2,26 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Properties;
+
 import com.fazecast.jSerialComm.SerialPort;
+import jdk.jfr.Frequency;
+
 import javax.sound.sampled.*;
 
 public class Main implements ActionListener {
     SerialPort sp;
 
-    private int count = 0;
+    Properties persistence = new Properties();
+
     private Color background = new Color(28, 28, 31);
     private final String primaryFont = "Stencil";
     private Float frequency = 89.9f;
@@ -33,20 +43,54 @@ public class Main implements ActionListener {
 
     // Audio variables
     private TargetDataLine microphone;
+    private String microphoneName;
     private SourceDataLine speakers;
+    private String speakerName;
     private final AudioFormat format = new AudioFormat(44100, 16, 2, true, true);
     private JComboBox<String> portComboBox;
     private JComboBox<String> inputComboBox;
     private JComboBox<String> outputComboBox;
 
     public Main() {
+        // Read persistence file
+        File configDir = new File(new File(System.getProperty("user.home")), ".flamefishradio");
+        if (!configDir.exists()) {
+            if(configDir.mkdir())
+            {System.out.println("Created config directory.");}
+            else{throw new RuntimeException("Failed to create config directory.");}
+        }
+
+        String configDirPath = configDir.getAbsolutePath();
+
+        try {
+            persistence.load(new FileInputStream(configDirPath + "/config.properties"));
+            System.out.println("Config successfully loaded.");
+        } catch (IOException e) {
+            System.out.println("Config file doesn't exist. Creating.");
+            try {
+                File configFile = new File(configDirPath + "/config.properties");
+                configFile.createNewFile();
+//                Files.createFile(Path.of(configDirPath + "/config.properties"));
+                System.out.println("Created config file.");
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
+        frequency = Float.parseFloat(persistence.getProperty("frequency","89.9"));
+        commName = persistence.getProperty("commName","COM6");
+        microphoneName = persistence.getProperty("microphoneName","Microphone (High Definition Audio Device)");
+        speakerName = persistence.getProperty("speakerName","Primary Sound Driver");
+
+        System.out.println(speakerName);
+
         // Set up serial communication
         for (SerialPort port : SerialPort.getCommPorts()) {
             System.out.println(port.getSystemPortName());
         }
         System.out.println(Arrays.toString(SerialPort.getCommPorts()));
 
-        sp = SerialPort.getCommPort("COM6");
+        sp = SerialPort.getCommPort(commName);
         System.out.println(sp.getPortDescription());
 
         sp.setComPortParameters(9600,8,1,0);
@@ -55,6 +99,18 @@ public class Main implements ActionListener {
         if(!sp.openPort()) {
             System.out.println("\nCOM port not available\n");
             return;
+        }
+
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println(frequency);
+        try {
+            sp.getOutputStream().write((frequency.toString() + "\n").getBytes());
+        } catch (IOException e) {
+            System.out.println("Exception while setting frequency: " + e.getMessage());
         }
 
         // Initialize the main frame and panel
@@ -142,7 +198,9 @@ public class Main implements ActionListener {
         portComboBox = new JComboBox<>();
         portComboBox.addActionListener(this);
         inputComboBox = new JComboBox<>();
+        inputComboBox.addActionListener(this);
         outputComboBox = new JComboBox<>();
+        outputComboBox.addActionListener(this);
 
         // Populate the combo boxes with available mixers
         populateComboBoxes();
@@ -176,12 +234,6 @@ public class Main implements ActionListener {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Closing");
             try {
-                if (sp.isOpen()) {
-                    // Send a message to the Arduino before closing
-                    sp.getOutputStream().write("0\n".getBytes());
-                    Thread.sleep(100); // Shorter sleep to avoid long delay
-                    sp.closePort(); // Close the serial port gracefully
-                }
                 // Close the audio lines
                 if (microphone != null && microphone.isOpen()) {
                     microphone.stop();
@@ -191,7 +243,26 @@ public class Main implements ActionListener {
                     speakers.stop();
                     speakers.close();
                 }
-            } catch (IOException | InterruptedException e) {
+                // Write to properties file
+                persistence.setProperty("frequency",Float.toString(frequency));
+                System.out.println(frequency);
+                persistence.setProperty("commName",commName);
+                System.out.println(commName);
+                persistence.setProperty("microphoneName",microphoneName);
+                System.out.println(microphoneName);
+                persistence.setProperty("speakerName",speakerName);
+                System.out.println(speakerName);
+
+                System.out.println(configDirPath + "/config.properties");
+                persistence.store(new FileWriter(configDirPath + "/config.properties"), null);
+
+//                if (sp.isOpen()) {
+//                    // Send a message to the Arduino before closing
+//                    sp.getOutputStream().write("0\n".getBytes());
+//                    Thread.sleep(100); // Shorter sleep to avoid long delay
+//                    sp.closePort(); // Close the serial port gracefully
+//                }
+            } catch (IOException e) {
                 System.err.println("Error during shutdown: " + e.getMessage());
             }
         }, "Shutdown-thread"));
@@ -216,9 +287,15 @@ public class Main implements ActionListener {
 
         // Set default selections (system default)
         try {
-            inputComboBox.setSelectedItem("Microphone (High Definition Audio Device)");
+            inputComboBox.setSelectedItem(microphoneName);
         } catch (Exception e) {
             inputComboBox.setSelectedItem(AudioSystem.getMixer(AudioSystem.getMixerInfo()[0]).getMixerInfo().getName());
+        }
+
+        try {
+            outputComboBox.setSelectedItem(speakerName);
+        } catch (Exception e) {
+            outputComboBox.setSelectedItem(AudioSystem.getMixer(AudioSystem.getMixerInfo()[0]).getMixerInfo().getName());
         }
 
         try {
@@ -227,7 +304,6 @@ public class Main implements ActionListener {
             System.out.println("Default port not available.");
         }
 
-        outputComboBox.setSelectedItem(AudioSystem.getMixer(AudioSystem.getMixerInfo()[0]).getMixerInfo().getName());
 
         comboBoxesPopulated = true;
     }
@@ -356,12 +432,24 @@ public class Main implements ActionListener {
                 new_sp.setComPortParameters(9600, 8, 1, 0);
                 new_sp.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_BLOCKING, 10000, 10000);
                 sp = new_sp;
+
+                Thread.sleep(3000);
+                sp.getOutputStream().write((frequency.toString() + "\n").getBytes());
+
             } catch (Exception ex) {
                 System.out.println("Switching comm port failed: " + ex.getMessage());
             }
             System.out.println(commName);
         } else {
             System.out.println(e.getActionCommand());
+        }
+
+        System.out.println(comboBoxesPopulated);
+        if (comboBoxesPopulated) {
+            commName = (String) portComboBox.getSelectedItem();
+            speakerName = (String) outputComboBox.getSelectedItem();
+            microphoneName = (String) inputComboBox.getSelectedItem();
+            System.out.println("Set commName speakerName and microphoneName.");
         }
     }
 
