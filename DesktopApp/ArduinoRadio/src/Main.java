@@ -246,6 +246,7 @@ public class Main implements ActionListener {
         lowerLeftPanel = new JScrollPane(scrollPanel);
         lowerLeftPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         lowerLeftPanel.setBackground(background);
+        lowerLeftPanel.getVerticalScrollBar().setUnitIncrement(4);
         leftPanel.add(lowerLeftPanel, gbc);
 
         stationSearchButton = new JButton("Scan For Stations");
