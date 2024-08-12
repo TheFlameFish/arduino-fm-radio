@@ -539,6 +539,12 @@ public class Main implements ActionListener {
     }
 
     public void updateStationsList() { // Populates the stations scroll panel with the stations list array
+        Color background1 = Color.GRAY.darker();
+        Color background2 = Color.GRAY;
+        Color foreground = Color.WHITE;
+
+        int index = 0;
+
         scrollPanel.removeAll();
         for (String o : stations) {
             JPanel panel = new JPanel();
@@ -561,6 +567,9 @@ public class Main implements ActionListener {
             JButton button = new JButton(o);
             button.setAlignmentX(Component.CENTER_ALIGNMENT);
             button.setMaximumSize(new Dimension(Integer.MAX_VALUE, button.getPreferredSize().height));
+            button.setBackground( (index % 2 == 0) ? background1 : background2 );
+            button.setForeground(foreground);
+            button.setFont(new Font(primaryFont, Font.BOLD,15));
             button.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -571,6 +580,8 @@ public class Main implements ActionListener {
 
             JButton removeButton = new JButton("X");
             removeButton.setForeground(Color.RED);
+            removeButton.setBackground(background1);
+            removeButton.setFont(new Font(primaryFont, Font.BOLD,15));
             removeButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -587,6 +598,7 @@ public class Main implements ActionListener {
             addobjects(button,panel,gbl,gbc,0,0,2,1);
             gbc.weightx = 0.1;
             addobjects(removeButton,panel,gbl,gbc,2,0,1,1);
+            index++;
         }
         scrollPanel.revalidate();
         scrollPanel.repaint();
