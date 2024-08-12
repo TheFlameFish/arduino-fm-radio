@@ -248,7 +248,7 @@ public class Main implements ActionListener {
         lowerLeftPanel.setBackground(background);
         leftPanel.add(lowerLeftPanel, gbc);
 
-        stationSearchButton = new JButton("Search For Stations");
+        stationSearchButton = new JButton("Scan For Stations");
         stationSearchButton.setBackground(Color.DARK_GRAY);
         stationSearchButton.setForeground(Color.WHITE);
         stationSearchButton.addActionListener(this);
