@@ -39,11 +39,13 @@ public class Main implements ActionListener {
     private JPanel upperLeftPanel;
     private JPanel labelPanel;
     private JPanel inputPanel;
+    private JPanel frequencyButtonPanel;
     private JScrollPane lowerLeftPanel;
     private JPanel lowerLeftPanelHeader;
     private JPanel scrollPanel;
     private JPanel rightPanel;
     private JButton frequencySetButton;
+    private JButton frequencySaveButton;
     private JButton stationSearchButton;
     private JLabel label;
     private JTextField frequencyInput;
@@ -144,7 +146,7 @@ public class Main implements ActionListener {
                 // Print the received string
                 System.out.println(newString);
 
-                // Optionally add the string to a list or perform other actions
+                if (stations.contains(newString)) {return;}
                 stations.add(newString);
                 updateStationsList();
             }
@@ -213,10 +215,25 @@ public class Main implements ActionListener {
         frequencyInput.addActionListener(this);
         inputPanel.add(frequencyInput, BorderLayout.CENTER);
 
-        frequencySetButton = new JButton("Set frequency");
+        frequencyButtonPanel = new JPanel();
+        frequencyButtonPanel.setLayout(new GridLayout(1,0));
+        inputPanel.add(frequencyButtonPanel, BorderLayout.EAST);
+
+        frequencySetButton = new JButton("Set");
         frequencySetButton.addActionListener(this);
         frequencySetButton.setFont(new Font(primaryFont, Font.BOLD, 14));
-        inputPanel.add(frequencySetButton, BorderLayout.EAST);
+        frequencyButtonPanel.add(frequencySetButton);
+
+        frequencySaveButton = new JButton("Save");
+        frequencySaveButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                stations.add(frequency.toString());
+                updateStationsList();
+            }
+        });
+        frequencySaveButton.setFont(new Font(primaryFont, Font.BOLD, 14));
+        frequencyButtonPanel.add(frequencySaveButton);
 
         scrollPanel = new JPanel();
         scrollPanel.setLayout(new BoxLayout(scrollPanel,BoxLayout.Y_AXIS));
@@ -459,7 +476,7 @@ public class Main implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (Objects.equals(e.getActionCommand(), "Set frequency") || e.getSource() == frequencyInput) {
+        if (e.getSource() == frequencySetButton || e.getSource() == frequencyInput) {
             try {
                 frequency = Float.parseFloat(frequencyInput.getText());
                 if (frequency != 0.0f) {
@@ -514,7 +531,6 @@ public class Main implements ActionListener {
     }
 
     public void scanStations() {
-        stations.clear();
         try {
             sp.getOutputStream().write("search\n".getBytes());
         } catch (IOException ex) {
