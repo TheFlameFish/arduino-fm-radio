@@ -1,13 +1,13 @@
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
@@ -16,9 +16,10 @@ import java.util.Properties;
 import com.fazecast.jSerialComm.SerialPort;
 import com.fazecast.jSerialComm.SerialPortDataListener;
 import com.fazecast.jSerialComm.SerialPortEvent;
-import jdk.jfr.Frequency;
 
 import javax.sound.sampled.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 public class Main implements ActionListener {
     SerialPort sp;
@@ -28,8 +29,10 @@ public class Main implements ActionListener {
     private Color background = new Color(28, 28, 31);
     private final String primaryFont = "Stencil";
     private Float frequency = 89.9f;
+    private Float volume = 1.0f;
     private ArrayList<String> stations;
     private String commName = "COM6";
+    private boolean muted = false;
     private boolean comboBoxesPopulated = false;
 
     // Declare the components as private instance variables
@@ -44,6 +47,7 @@ public class Main implements ActionListener {
     private JPanel lowerLeftPanelHeader;
     private JPanel scrollPanel;
     private JPanel rightPanel;
+    private JSlider volumeSlider;
     private JButton frequencySetButton;
     private JButton frequencySaveButton;
     private JButton stationSearchButton;
@@ -64,9 +68,11 @@ public class Main implements ActionListener {
         // Read persistence file
         File configDir = new File(new File(System.getProperty("user.home")), ".flamefishradio");
         if (!configDir.exists()) {
-            if(configDir.mkdir())
-            {System.out.println("Created config directory.");}
-            else{throw new RuntimeException("Failed to create config directory.");}
+            if (configDir.mkdir()) {
+                System.out.println("Created config directory.");
+            } else {
+                throw new RuntimeException("Failed to create config directory.");
+            }
         }
 
         String configDirPath = configDir.getAbsolutePath();
@@ -86,14 +92,14 @@ public class Main implements ActionListener {
             }
         }
 
-        frequency = Float.parseFloat(persistence.getProperty("frequency","89.9"));
-        commName = persistence.getProperty("commName","COM6");
-        microphoneName = persistence.getProperty("microphoneName","Microphone (High Definition Audio Device)");
-        speakerName = persistence.getProperty("speakerName","Primary Sound Driver");
+        // Get persistence stuff
+        frequency = Float.parseFloat(persistence.getProperty("frequency", "89.9"));
+        commName = persistence.getProperty("commName", "COM6");
+        microphoneName = persistence.getProperty("microphoneName", "Microphone (High Definition Audio Device)");
+        speakerName = persistence.getProperty("speakerName", "Primary Sound Driver");
         stations = new ArrayList<String>(Arrays.asList(
-                persistence.getProperty("stations","").split(";")));
-        System.out.println(stations);
-
+                persistence.getProperty("stations", "").split(";")));
+        volume = Float.parseFloat(persistence.getProperty("volume","1"));
 
         System.out.println(speakerName);
 
@@ -106,10 +112,10 @@ public class Main implements ActionListener {
         sp = SerialPort.getCommPort(commName);
         System.out.println(sp.getPortDescription());
 
-        sp.setComPortParameters(9600,8,1,0);
-        sp.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING|SerialPort.TIMEOUT_READ_BLOCKING,10000,10000);
+        sp.setComPortParameters(9600, 8, 1, 0);
+        sp.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_BLOCKING, 10000, 10000);
 
-        if(!sp.openPort()) {
+        if (!sp.openPort()) {
             System.out.println("\nCOM port not available\n");
             return;
         }
@@ -146,7 +152,9 @@ public class Main implements ActionListener {
                 // Print the received string
                 System.out.println(newString);
 
-                if (stations.contains(newString)) {return;}
+                if (stations.contains(newString)) {
+                    return;
+                }
                 stations.add(newString);
                 updateStationsList();
             }
@@ -216,7 +224,7 @@ public class Main implements ActionListener {
         inputPanel.add(frequencyInput, BorderLayout.CENTER);
 
         frequencyButtonPanel = new JPanel();
-        frequencyButtonPanel.setLayout(new GridLayout(1,0));
+        frequencyButtonPanel.setLayout(new GridLayout(1, 0));
         inputPanel.add(frequencyButtonPanel, BorderLayout.EAST);
 
         frequencySetButton = new JButton("Set");
@@ -236,8 +244,7 @@ public class Main implements ActionListener {
         frequencyButtonPanel.add(frequencySaveButton);
 
         scrollPanel = new JPanel();
-        scrollPanel.setLayout(new BoxLayout(scrollPanel,BoxLayout.Y_AXIS));
-
+        scrollPanel.setLayout(new BoxLayout(scrollPanel, BoxLayout.Y_AXIS));
 
 
         // Adjust constraints for the lowerLeftPanel to take up more space
@@ -256,7 +263,6 @@ public class Main implements ActionListener {
         JViewport columnHeaderViewport = new JViewport();
         columnHeaderViewport.setView(stationSearchButton);
         lowerLeftPanel.setColumnHeader(columnHeaderViewport);
-
 
 
         // Set up the right panel and add it to the main panel
@@ -290,8 +296,74 @@ public class Main implements ActionListener {
         rightPanel.add(inputDeviceLabel);
         rightPanel.add(inputComboBox);
 
+        JPanel outputPanel = new JPanel();
+        outputPanel.setLayout(new GridBagLayout());
+        outputPanel.setBackground(background);
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0.1;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
         JLabel outputDeviceLabel = new JLabel("Select Output Device:");
-        rightPanel.add(outputDeviceLabel);
+        outputPanel.add(outputDeviceLabel,gbc);
+
+        gbc.insets = new Insets(0, 0, 0, 15);
+        gbc.gridx = 1;
+        gbc.weightx = 0.9;
+        volumeSlider = new JSlider(SwingConstants.HORIZONTAL, 0, 100, (int) (volume * 100));
+        volumeSlider.createStandardLabels(25,0);
+        volumeSlider.addChangeListener(new ChangeListener() {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                volume = volumeSlider.getValue() / 100.0f;
+            }
+        });
+        outputPanel.add(volumeSlider,gbc);
+
+        BufferedImage unmutedImage;
+        BufferedImage mutedImage;
+        try {
+            unmutedImage = ImageIO.read(getClass().getResource("/resources/images/unmuted_icon.png"));
+            mutedImage = ImageIO.read(getClass().getResource("/resources/images/muted_icon.png"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+
+        gbc.gridx = 2;
+        gbc.gridy = 0;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.insets = new Insets(0, 0, 0, 0);
+
+        JButton muteButton = new JButton();
+
+
+        Icon unmutedIcon = new ImageIcon(unmutedImage);
+        Icon mutedIcon = new ImageIcon(mutedImage);
+
+        muteButton.setIcon(unmutedIcon);
+        muteButton.setHorizontalAlignment(SwingConstants.RIGHT);
+        muteButton.setBorder(BorderFactory.createEmptyBorder());
+        muteButton.setContentAreaFilled(false);
+        muteButton.setMaximumSize(new Dimension(48,48));
+        muteButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                muted = !muted;
+
+                muteButton.setIcon((muted) ? mutedIcon : unmutedIcon);
+            }
+        });
+
+        outputPanel.add(muteButton,gbc);
+
+        rightPanel.add(outputPanel);
+
         outputDeviceLabel.setForeground(Color.WHITE);
         outputDeviceLabel.setFont(new Font(primaryFont, Font.PLAIN, 14));
         rightPanel.add(outputComboBox);
@@ -318,16 +390,17 @@ public class Main implements ActionListener {
                     speakers.close();
                 }
                 // Write to properties file
-                persistence.setProperty("frequency",Float.toString(frequency));
+                persistence.setProperty("frequency", Float.toString(frequency));
                 System.out.println(frequency);
-                persistence.setProperty("commName",commName);
+                persistence.setProperty("commName", commName);
                 System.out.println(commName);
-                persistence.setProperty("microphoneName",microphoneName);
+                persistence.setProperty("microphoneName", microphoneName);
                 System.out.println(microphoneName);
-                persistence.setProperty("speakerName",speakerName);
+                persistence.setProperty("speakerName", speakerName);
                 System.out.println(speakerName);
-                persistence.setProperty("stations",arrayToString(stations));
+                persistence.setProperty("stations", arrayToString(stations));
                 System.out.println(arrayToString(stations));
+                persistence.setProperty("volume",volume.toString());
 
                 System.out.println(configDirPath + "/config.properties");
                 persistence.store(new FileWriter(configDirPath + "/config.properties"), null);
@@ -449,13 +522,16 @@ public class Main implements ActionListener {
                         // Apply a simple noise gate
                         boolean isSilent = true;
                         for (int i = 0; i < bytesRead; i++) {
-                            if (Math.abs(buffer[i]) > NOISE_THRESHOLD) {
+                            if (Math.abs(buffer[i]) > NOISE_THRESHOLD && !muted) {
                                 isSilent = false;
                                 break;
                             }
                         }
 
                         if (!isSilent) {
+                            for (int i = 0; i < bytesRead; i++) {
+                                buffer[i] = (byte) (buffer[i] * volume);
+                            }
                             speakers.write(buffer, 0, bytesRead);
                         } else {
                             // If noise gate is triggered, write silence
