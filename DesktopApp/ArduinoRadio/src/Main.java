@@ -462,6 +462,9 @@ public class Main implements ActionListener {
             // Set a threshold for the noise gate
             final int NOISE_THRESHOLD = 20;
 
+            // Low-pass filter parameters
+            final float ALPHA = 0.9f; // Smoothing factor
+
             while (true) { // Continuous loop to check for device selection changes
                 // Get the selected input and output devices
                 String selectedInputDevice = (String) inputComboBox.getSelectedItem();
@@ -502,6 +505,7 @@ public class Main implements ActionListener {
                 speakers.start();
 
                 byte[] buffer = new byte[4096];
+                byte[] previousBuffer = new byte[4096]; // Buffer to store the previous output
                 int bytesRead;
 
                 // Capture and play audio in a loop
@@ -529,6 +533,15 @@ public class Main implements ActionListener {
                         }
 
                         if (!isSilent) {
+                            // Apply a low-pass filter
+                            for (int i = 0; i < bytesRead; i++) {
+                                buffer[i] = (byte) ((ALPHA * buffer[i]) + ((1 - ALPHA) * previousBuffer[i]));
+                            }
+
+                            // Store the filtered output for the next iteration
+                            System.arraycopy(buffer, 0, previousBuffer, 0, bytesRead);
+
+                            // Apply volume and write to speakers
                             for (int i = 0; i < bytesRead; i++) {
                                 buffer[i] = (byte) (buffer[i] * volume);
                             }
@@ -547,6 +560,7 @@ public class Main implements ActionListener {
     }
 
 
+
     public static void main(String[] args) {
         new Main();
     }
@@ -561,7 +575,7 @@ public class Main implements ActionListener {
                 } else {
                     label.setText("Muted");
                 }
-                
+
                 // Send the frequency value to the Arduino
                 sp.getOutputStream().write((frequency.toString() + "\n").getBytes());
                 frequencyInput.setText("");
