@@ -115,10 +115,11 @@ public class Main implements ActionListener {
         sp.setComPortParameters(9600, 8, 1, 0);
         sp.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING | SerialPort.TIMEOUT_READ_BLOCKING, 10000, 10000);
 
-        if (!sp.openPort()) {
-            System.out.println("\nCOM port not available\n");
-            return;
-        }
+        sp.openPort();
+//        if (!sp.openPort()) {
+//            System.out.println("\nCOM port not available\n");
+//            return;
+//        }
 
         try {
             Thread.sleep(3000);
